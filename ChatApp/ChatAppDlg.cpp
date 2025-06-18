@@ -59,6 +59,9 @@ CChatAppDlg::CChatAppDlg(CWnd* pParent /*=nullptr*/)
 void CChatAppDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_EDIT_CHATBOX, m_edChatBox);
+	DDX_Control(pDX, IDC_IPADDRESS1, m_ipServer);
+	DDX_Control(pDX, IDC_EDIT1, m_ptServert);
 }
 
 BEGIN_MESSAGE_MAP(CChatAppDlg, CDialogEx)
@@ -102,6 +105,7 @@ BOOL CChatAppDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
 
 	// TODO: 여기에 추가 초기화 작업을 추가합니다.
+	Init();
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
 
@@ -156,6 +160,17 @@ HCURSOR CChatAppDlg::OnQueryDragIcon()
 
 
 
+void CChatAppDlg::Init()
+{
+	m_edChatBox.ModifyStyle(0, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN);
+}
+
+void CChatAppDlg::AddChat(CString sChat)
+{
+	m_sChat.Append(sChat);
+	m_edChatBox.SetWindowText(m_sChat);
+}
+
 void CChatAppDlg::OnBnClickedButtonServer()
 {
 	if (!m_server.GetAccept())
@@ -164,6 +179,7 @@ void CChatAppDlg::OnBnClickedButtonServer()
 		if (m_server.StartServer())
 		{
 			SetDlgItemText(IDC_BUTTON_SERVER, _T("사용자 입장 대기 중... (대기취소)"));
+			AddChat(CString(_T("사용자 입장 대기 중... (대기취소)")));
 		}
 	}
 	else
@@ -179,5 +195,13 @@ void CChatAppDlg::OnBnClickedButtonConnect()
 	m_server.SetExit(TRUE);								//서버 중지
 	SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
 
+	CString sServerIP, sServerPort;
+	UINT uiPort;
+	m_ipServer.GetWindowText(sServerIP);
+	m_ptServert.GetWindowText(sServerPort);
+	if(m_client.Connect(sServerIP, _ttoi(sServerPort)))
+	{
+
+	}
 
 }

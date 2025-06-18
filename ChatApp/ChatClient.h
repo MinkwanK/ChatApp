@@ -7,7 +7,8 @@ public:
 	~ChatClient();
 
 public:
-	bool MakeNonBlockingSocket(CString sIP, int iPort);
+	bool MakeNonBlockingSocket(CString sServerIP, UINT uiPort);
+	bool Connect(CString sServerIP, UINT uiPort);
 
 public:
 

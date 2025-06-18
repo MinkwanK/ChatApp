@@ -2,6 +2,7 @@
 // ChatAppDlg.h: 헤더 파일
 //
 #include "ChatServer.h"
+#include "ChatClient.h"
 #pragma once
 
 
@@ -32,9 +33,16 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
-	afx_msg void OnBnClickedButtonServer();
+	ChatServer m_server;
+	ChatClient m_client;
+	CString m_sChat;
+	CEdit m_edChatBox;
 
 public:
-	ChatServer m_server;
+	void Init();
+	void AddChat(CString sChat);
+	afx_msg void OnBnClickedButtonServer();
 	afx_msg void OnBnClickedButtonConnect();
+	CIPAddressCtrl m_ipServer;
+	CEdit m_ptServert;
 };
