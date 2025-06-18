@@ -201,7 +201,7 @@ void CChatAppDlg::OnBnClickedButtonConnect()
 	m_ptServert.GetWindowText(sServerPort);
 	if(m_client.Connect(sServerIP, _ttoi(sServerPort)))
 	{
-
+		AddChat(CString(_T("클라이언트 접속 중...")));
 	}
 
 }

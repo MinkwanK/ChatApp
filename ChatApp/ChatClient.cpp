@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ChatClient.h"
 #include <WS2tcpip.h>
+#include <thread>
 
 ChatClient::ChatClient()
 {
@@ -58,11 +59,71 @@ bool ChatClient::MakeNonBlockingSocket(CString sServerIP, UINT uiPort)
     sValue.Format(_T("Trying to connect to %s:%d...\n"), sServerIP, uiPort);
     OutputDebugString(sValue);
 
+    m_sServerIP = sServerIP;
+    m_uiPort = uiPort;
+
     return true;
 }
 
 bool ChatClient::Connect(CString sServerIP, UINT uiPort)
 {
-    MakeNonBlockingSocket(sServerIP, uiPort);
-    return false;
+    if (!MakeNonBlockingSocket(sServerIP, uiPort))
+    {
+        OutputDebugString(_T("클라이언트 Connect 위한 소켓 생성 실패\n"));
+    }
+
+    std::thread ConnectThread(ChatClient::ConnectThread, this);
+    ConnectThread.detach();
+    return TRUE;
+}
+
+bool ChatClient::ConnectThread(ChatClient* pClient)
+{
+    if (pClient)
+    {
+        return pClient->ConnectProc();
+    }
+
+    return FALSE;
+}
+
+bool ChatClient::ConnectProc()
+{
+    if (!m_sock) return FALSE;
+
+    while (TRUE)
+    {
+        fd_set writeSet;
+        FD_ZERO(&writeSet);
+        FD_SET(m_sock, &writeSet);
+
+        timeval timeout;
+        timeout.tv_sec = 1; // 최대 1초 대기
+        timeout.tv_usec = 0;
+
+        int iResult = select(0, NULL, &writeSet, NULL, &timeout);
+        if (iResult > 0 && FD_ISSET(m_sock, &writeSet)) //감지되면 클라이언트 연결 성공
+        {
+            OutputDebugString(_T("클라이언트 접속 성공\n"));
+            return true;
+        }
+        else 
+        {
+            // 연결 실패 또는 타임아웃
+            int iOptVal;
+            int iOptLen = sizeof(iOptVal);
+            getsockopt(m_sock, SOL_SOCKET, SO_ERROR, (char*)&iOptVal, &iOptLen);
+            // optval을 통해 에러 코드 확인 가능
+
+            if (iOptVal == 0)
+            {
+                OutputDebugString(_T("클라이언트 접속 성공\n"));
+                return TRUE;
+            }
+            else
+            {
+                OutputDebugString(_T("클라이언트 접속 실패... 재시도\n"));
+            }
+        }
+    }
 }
