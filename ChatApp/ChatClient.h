@@ -18,6 +18,5 @@ public:
 public:
 	CString m_sServerIP;
 	UINT m_uiPort;
-	CArray<CString> m_aSend;
 };
 

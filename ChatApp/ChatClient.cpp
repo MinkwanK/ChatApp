@@ -154,14 +154,19 @@ bool ChatClient::SendProc()
         const int iSendCount = m_aSend.GetCount();
         if (iSendCount > 0)
         {
-            for (int i = 0; i < iSendCount; i++)
+            for (int i = 0; i < m_aSend.GetCount(); i++)
             {
                 CString sValue = m_aSend.GetAt(i);
                 char cSend[500];
                 memcpy_s(&cSend, 500, sValue, sValue.GetLength());
                 send(m_sock, cSend, sValue.GetLength(), 0);
+                
+                sValue.Format(_T("%s 패킷 전송 완료\n"), cSend);
+                if (RemoveSend(i)) i -= 1;
+
+                OutputDebugString(sValue);
             }
         }
     }
-
+    return false;
 }

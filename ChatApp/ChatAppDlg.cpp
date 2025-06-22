@@ -164,6 +164,8 @@ HCURSOR CChatAppDlg::OnQueryDragIcon()
 void CChatAppDlg::Init()
 {
 	m_edChatBox.ModifyStyle(0, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN);
+	m_ipServer.SetWindowText(_T("127.0.0.1"));
+	m_edChatBox.SetWindowText(_T("9000"));
 }
 
 void CChatAppDlg::AddChat(CString sChat)
@@ -210,5 +212,7 @@ void CChatAppDlg::OnBnClickedButtonConnect()
 
 void CChatAppDlg::OnBnClickedButtonSend()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	CString sSend;
+	GetDlgItemText(IDC_EDIT_INPUT, sSend);
+	m_client.AddSend(sSend);
 }

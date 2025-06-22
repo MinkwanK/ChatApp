@@ -37,3 +37,18 @@ void TCPSocket::Close()
 	CloseSocket();
 	CloseWinSocket();
 }
+
+void TCPSocket::AddSend(CString sSend)
+{
+	m_aSend.Add(sSend);
+}
+
+bool TCPSocket::RemoveSend(int iIndex)
+{
+	if (iIndex < m_aSend.GetSize())
+	{
+		m_aSend.RemoveAt(iIndex);
+		return true;
+	}
+	return false;
+}
