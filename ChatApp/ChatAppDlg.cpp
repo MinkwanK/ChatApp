@@ -70,6 +70,7 @@ BEGIN_MESSAGE_MAP(CChatAppDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON_SERVER, &CChatAppDlg::OnBnClickedButtonServer)
 	ON_BN_CLICKED(IDC_BUTTON_CONNECT, &CChatAppDlg::OnBnClickedButtonConnect)
+	ON_BN_CLICKED(IDC_BUTTON_SEND, &CChatAppDlg::OnBnClickedButtonSend)
 END_MESSAGE_MAP()
 
 
@@ -204,4 +205,10 @@ void CChatAppDlg::OnBnClickedButtonConnect()
 		AddChat(CString(_T("클라이언트 접속 중...")));
 	}
 
+}
+
+
+void CChatAppDlg::OnBnClickedButtonSend()
+{
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 }

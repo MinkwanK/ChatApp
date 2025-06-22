@@ -89,8 +89,8 @@ bool ChatClient::ConnectThread(ChatClient* pClient)
 
 bool ChatClient::ConnectProc()
 {
-    if (!m_sock) return FALSE;
-
+    if (!m_sock) return false;
+    bool bResult = false;
     while (TRUE)
     {
         fd_set writeSet;
@@ -105,7 +105,8 @@ bool ChatClient::ConnectProc()
         if (iResult > 0 && FD_ISSET(m_sock, &writeSet)) //감지되면 클라이언트 연결 성공
         {
             OutputDebugString(_T("클라이언트 접속 성공\n"));
-            return true;
+            bResult = true;
+            break;
         }
         else 
         {
@@ -118,12 +119,49 @@ bool ChatClient::ConnectProc()
             if (iOptVal == 0)
             {
                 OutputDebugString(_T("클라이언트 접속 성공\n"));
-                return TRUE;
+                bResult = true;
+                break;
             }
             else
             {
                 OutputDebugString(_T("클라이언트 접속 실패... 재시도\n"));
+                bResult = false;
             }
         }
     }
+
+    if (bResult)
+    {
+        std::thread SendThread(&ChatClient::SendThread, this);
+        SendThread.detach();
+    }
+}
+
+bool ChatClient::SendThread(ChatClient* pClient)
+{
+    if (pClient)
+    {
+        return pClient->SendProc();
+    }
+    return false;
+}
+
+bool ChatClient::SendProc()
+{
+    while (!m_bExit)
+    {
+        DWORD dwResult = WaitForSingleObject(NULL, 1000);
+        const int iSendCount = m_aSend.GetCount();
+        if (iSendCount > 0)
+        {
+            for (int i = 0; i < iSendCount; i++)
+            {
+                CString sValue = m_aSend.GetAt(i);
+                char cSend[500];
+                memcpy_s(&cSend, 500, sValue, sValue.GetLength());
+                send(m_sock, cSend, sValue.GetLength(), 0);
+            }
+        }
+    }
+
 }

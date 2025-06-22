@@ -15,8 +15,8 @@ public:
 	static bool Accept(ChatServer* pServer);
 	bool Acceptproc();
 	bool GetAccept() { return m_accepting; };
-	bool GetExit() { return m_exit; };
-	void SetExit(bool bExit) { m_exit = bExit; }
+	bool GetExit() { return m_bExit; };
+	void SetExit(bool bExit) { m_bExit = bExit; }
 	
 public:
 	bool m_accepting = FALSE;

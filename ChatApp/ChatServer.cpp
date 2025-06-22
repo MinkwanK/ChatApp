@@ -103,7 +103,7 @@ bool ChatServer::Acceptproc()
     CString sValue;
     m_accepting = true;
     // 논블로킹 방식으로 클라이언트 수신 대기 (select 사용)
-    while (!m_exit)    //클라이언트 연결을 기다림 
+    while (!m_bExit)    //클라이언트 연결을 기다림 
     {
         fd_set readfds;                  // 감시할 소켓 목록 선언
         FD_ZERO(&readfds);              // 목록 초기화

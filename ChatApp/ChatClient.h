@@ -12,8 +12,12 @@ public:
 	static bool ConnectThread(ChatClient* pClient);
 	bool ConnectProc();
 
+	static bool SendThread(ChatClient* pClient);
+	bool SendProc();
+
 public:
 	CString m_sServerIP;
 	UINT m_uiPort;
+	CArray<CString> m_aSend;
 };
 

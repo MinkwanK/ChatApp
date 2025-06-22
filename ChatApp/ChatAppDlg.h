@@ -45,4 +45,5 @@ public:
 	afx_msg void OnBnClickedButtonConnect();
 	CIPAddressCtrl m_ipServer;
 	CEdit m_ptServert;
+	afx_msg void OnBnClickedButtonSend();
 };
