@@ -32,18 +32,27 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+
+public:
+	static CChatAppDlg* m_pInstance;
+	void InitInstance() { m_pInstance = this; }
 public:
 	ChatServer m_server;
 	ChatClient m_client;
 	CString m_sChat;
-	CEdit m_edChatBox;
 
 public:
 	void Init();
 	void AddChat(CString sChat);
+	static void CallBackHandler(CString sValue);	
+
+public:
 	afx_msg void OnBnClickedButtonServer();
 	afx_msg void OnBnClickedButtonConnect();
-	CIPAddressCtrl m_ipServer;
-	CEdit m_ptServert;
 	afx_msg void OnBnClickedButtonSend();
+
+public:
+	CIPAddressCtrl m_ipServer;
+	CEdit m_edPort;
+	CEdit m_edChatBox;
 };

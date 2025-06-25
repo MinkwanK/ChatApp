@@ -91,6 +91,8 @@ bool ChatClient::ConnectProc()
 {
     if (!m_sock) return false;
     bool bResult = false;
+    CString sValue;
+
     while (TRUE)
     {
         fd_set writeSet;
@@ -117,15 +119,23 @@ bool ChatClient::ConnectProc()
             // optval을 통해 에러 코드 확인 가능
 
             if (iOptVal == 0)
-            {
-                OutputDebugString(_T("클라이언트 접속 성공\n"));
+            {  
                 bResult = true;
+
+                sValue.Format(_T("%d 클라이언트 접속 성공\n"), m_sock);
+                OutputDebugString(sValue);
+                if(m_fCallback)
+                    m_fCallback(sValue);
                 break;
             }
             else
             {
-                OutputDebugString(_T("클라이언트 접속 실패... 재시도\n"));
                 bResult = false;
+
+                sValue.Format(_T("%d 클라이언트 접속 실패... 재시도\\n"), m_sock);
+                OutputDebugString(sValue);
+                if (m_fCallback)
+                    m_fCallback(sValue);
             }
         }
     }

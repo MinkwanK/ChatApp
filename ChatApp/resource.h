@@ -11,6 +11,7 @@
 #define IDC_BUTTON_CONNECT              1001
 #define IDC_IPADDRESS1                  1002
 #define IDC_EDIT1                       1003
+#define IDC_EDIT_PORT                   1003
 #define IDC_STATIC_IP                   1004
 #define IDC_STATIC_IP2                  1005
 #define IDC_STATIC_PORT                 1005

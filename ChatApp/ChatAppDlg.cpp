@@ -13,6 +13,8 @@
 #endif
 
 
+//실제 static 변수의 메모리 할당
+CChatAppDlg* CChatAppDlg::m_pInstance = nullptr;
 // 응용 프로그램 정보에 사용되는 CAboutDlg 대화 상자입니다.
 
 class CAboutDlg : public CDialogEx
@@ -54,6 +56,7 @@ CChatAppDlg::CChatAppDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_CHATAPP_DIALOG, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	InitInstance();
 }
 
 void CChatAppDlg::DoDataExchange(CDataExchange* pDX)
@@ -61,7 +64,7 @@ void CChatAppDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_EDIT_CHATBOX, m_edChatBox);
 	DDX_Control(pDX, IDC_IPADDRESS1, m_ipServer);
-	DDX_Control(pDX, IDC_EDIT1, m_ptServert);
+	DDX_Control(pDX, IDC_EDIT_PORT, m_edPort);
 }
 
 BEGIN_MESSAGE_MAP(CChatAppDlg, CDialogEx)
@@ -165,13 +168,28 @@ void CChatAppDlg::Init()
 {
 	m_edChatBox.ModifyStyle(0, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN);
 	m_ipServer.SetWindowText(_T("127.0.0.1"));
-	m_edChatBox.SetWindowText(_T("9000"));
+	m_edPort.SetWindowText(_T("9000"));
+
+	m_server.SetCallback(CallBackHandler);
+	m_client.SetCallback(CallBackHandler);
+	
 }
 
 void CChatAppDlg::AddChat(CString sChat)
 {
 	m_sChat.Append(sChat);
 	m_edChatBox.SetWindowText(m_sChat);
+}
+
+//static 함수는 클래스 안에 있어도 일반 함수 취급
+//메모리 상에 독립적으로 존재
+//일반 함수 포인터에 그대로 대깁 가능
+void CChatAppDlg::CallBackHandler(CString sValue)
+{
+	if (m_pInstance)
+	{
+		m_pInstance->AddChat(sValue);
+	}
 }
 
 void CChatAppDlg::OnBnClickedButtonServer()
@@ -201,7 +219,7 @@ void CChatAppDlg::OnBnClickedButtonConnect()
 	CString sServerIP, sServerPort;
 	UINT uiPort;
 	m_ipServer.GetWindowText(sServerIP);
-	m_ptServert.GetWindowText(sServerPort);
+	m_edPort.GetWindowText(sServerPort);
 	if(m_client.Connect(sServerIP, _ttoi(sServerPort)))
 	{
 		AddChat(CString(_T("클라이언트 접속 중...")));
@@ -215,4 +233,6 @@ void CChatAppDlg::OnBnClickedButtonSend()
 	CString sSend;
 	GetDlgItemText(IDC_EDIT_INPUT, sSend);
 	m_client.AddSend(sSend);
+	sSend.Format(_T("나: %s"), sSend);
+	AddChat(sSend);
 }
