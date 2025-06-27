@@ -1,8 +1,8 @@
 ﻿
 // ChatAppDlg.h: 헤더 파일
 //
-#include "ChatServer.h"
-#include "ChatClient.h"
+#include "Server.h"
+#include "Client.h"
 #pragma once
 
 
@@ -37,8 +37,8 @@ public:
 	static CChatAppDlg* m_pInstance;
 	void InitInstance() { m_pInstance = this; }
 public:
-	ChatServer m_server;
-	ChatClient m_client;
+	Server m_server;
+	Client m_client;
 	CString m_sChat;
 
 public:

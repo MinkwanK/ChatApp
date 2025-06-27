@@ -170,8 +170,8 @@ void CChatAppDlg::Init()
 	m_ipServer.SetWindowText(_T("127.0.0.1"));
 	m_edPort.SetWindowText(_T("9000"));
 
-	m_server.SetCallback(CallBackHandler);
-	m_client.SetCallback(CallBackHandler);
+	//m_server.SetCallback(CallBackHandler);
+	//m_client.SetCallback(CallBackHandler);
 	
 }
 

@@ -13,11 +13,14 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Client">
-      <UniqueIdentifier>{8283c432-828b-4b6f-8c72-1b11491f7383}</UniqueIdentifier>
+    <Filter Include="Network">
+      <UniqueIdentifier>{9bf47bdd-a638-4a46-b9f0-973b5a8ab5cc}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Server">
+    <Filter Include="Network\Server">
       <UniqueIdentifier>{d951f068-c218-4776-a336-2210de827449}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Client">
+      <UniqueIdentifier>{8283c432-828b-4b6f-8c72-1b11491f7383}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -39,14 +42,14 @@
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ChatServer.h">
-      <Filter>Server</Filter>
+    <ClInclude Include="Client.h">
+      <Filter>Network\Client</Filter>
     </ClInclude>
-    <ClInclude Include="ChatClient.h">
-      <Filter>Client</Filter>
+    <ClInclude Include="Server.h">
+      <Filter>Network\Server</Filter>
     </ClInclude>
     <ClInclude Include="TCPSocket.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Network</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -59,14 +62,14 @@
     <ClCompile Include="pch.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="ChatServer.cpp">
-      <Filter>Server</Filter>
+    <ClCompile Include="Client.cpp">
+      <Filter>Network\Client</Filter>
     </ClCompile>
-    <ClCompile Include="ChatClient.cpp">
-      <Filter>Client</Filter>
+    <ClCompile Include="Server.cpp">
+      <Filter>Network\Server</Filter>
     </ClCompile>
     <ClCompile Include="TCPSocket.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

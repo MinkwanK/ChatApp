@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "ChatServer.h"
+#include "Server.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <thread>
@@ -7,16 +7,22 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-ChatServer::ChatServer()
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#undef THIS_FILE
+static char THIS_FILE[] = __FILE__;
+#endif
+
+Server::Server()
 {
 
 }
-ChatServer::~ChatServer()
+Server::~Server()
 {
-    Close();
+    Clear();
 }
 
-bool ChatServer::MakeNonBlockingSocket()
+bool Server::MakeNonBlockingSocket()
 {
     CString sValue;
 
@@ -31,20 +37,20 @@ bool ChatServer::MakeNonBlockingSocket()
     u_long mode = 1;  // 1이면 non-blocking
     if (ioctlsocket(m_sock, FIONBIO, &mode) != 0) {
         std::cerr << "ioctlsocket failed.\n";
-        Close();
+        Clear();
         return false;
     }
 
-    // 4. 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택
+    // 4. 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택)
     sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;                // IPv4 사용
-    serverAddr.sin_addr.s_addr = INADDR_ANY;        // 모든 IP에서 수신
-    serverAddr.sin_port = 0;                        // 포트 0 -> OS가 가용 포트 자동 할당
+    serverAddr.sin_family = AF_INET;                        // IPv4 사용
+    serverAddr.sin_addr.s_addr = INADDR_ANY;                // 모든 IP에서 수신
+	serverAddr.sin_port = m_uiPort == -1 ? 0 : m_uiPort;    // 포트 0 -> OS가 가용 포트 자동 할당
 
      // 5. 바인딩 (소켓을 IP/포트에 연결) 
     if (bind(m_sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
         std::cerr << "Bind failed.\n";
-        Close();
+        Clear();
         return false;
     }
 
@@ -59,8 +65,11 @@ bool ChatServer::MakeNonBlockingSocket()
     return true;
 }
 
-bool ChatServer::StartServer()
+bool Server::StartServer(UINT uiPort /*= -1*/)
 {
+    if (uiPort > 0)
+        m_uiPort = uiPort;
+
     if (!MakeNonBlockingSocket())   //논블로킹 소켓 생성
     {
         AfxMessageBox(_T("서버 소켓 생성 실패"));
@@ -73,23 +82,23 @@ bool ChatServer::StartServer()
         return false;
     }
 
-    std::thread AcceptTrhead(&ChatServer::Accept, this);   //Accept Thread
+    std::thread AcceptTrhead(&Server::Accept, this);   //Accept Thread
     AcceptTrhead.detach();
     return true;
 }
 
-bool ChatServer::Listen()
+bool Server::Listen()
 {
         // 7. 리스닝 시작
-     if (listen(m_sock, SOMAXCONN) == SOCKET_ERROR) {
+     if (listen(GetSocket(), SOMAXCONN) == SOCKET_ERROR) {
          OutputDebugString(_T("Listen Failed\n"));
-         Close();
+         Clear();
          return false;
      }
      return true;
 }
 
-bool ChatServer::Accept(ChatServer* pServer)
+bool Server::Accept(Server* pServer)
 {
     if (pServer)
     {
@@ -98,7 +107,7 @@ bool ChatServer::Accept(ChatServer* pServer)
     return false;
 }
 
-bool ChatServer::Acceptproc()
+bool Server::Acceptproc()
 {
     CString sValue;
     m_accepting = true;
@@ -132,7 +141,7 @@ bool ChatServer::Acceptproc()
         }
         else
         {
-            OutputDebugString(_T("Select Failed\n"));
+            OutputDebugString(_T("Server: Select Failed\n"));
         }
     }
     m_accepting = false;
