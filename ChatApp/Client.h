@@ -22,6 +22,10 @@ protected:
 	static bool SendThread(Client* pClient);
 	bool SendProc();
 
+	//Recv
+	static bool RecvThread(Client* pClient);
+	bool RecvProc();
+
 private:
 	sockaddr_in m_serverAddr{}; //접속 대상 서버의 sockaddr_in
 };

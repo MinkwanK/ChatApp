@@ -1,7 +1,5 @@
 #include "pch.h"
 #include "TCPSocket.h"
-#include "ComonDefine.h"
-#include "ComonUtil.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -13,13 +11,14 @@ static char THIS_FILE[] = __FILE__;
 TCPSocket::TCPSocket()
 {
 	InitWinSocket();
-    InitializeCriticalSection(&m_cs);
+	InitializeCriticalSection(&m_cs);
 }
 
 TCPSocket::~TCPSocket()
 {
+	RemoveAllSend();
 	Clear();
-    DeleteCriticalSection(&m_cs); // 해제
+	DeleteCriticalSection(&m_cs); // 해제
 }
 
 bool TCPSocket::InitWinSocket()
@@ -45,63 +44,113 @@ void TCPSocket::CloseSocket()
 
 void TCPSocket::Clear()
 {
-    m_bExit = TRUE;
+	m_bExit = TRUE;
 	CloseSocket();
 	CloseWinSocket();
 }
 
 void TCPSocket::AddSend(PACKET packet)
 {
-    EnterCriticalSection(&m_cs);
+	EnterCriticalSection(&m_cs);
 	m_aSend.Add(packet);
-    LeaveCriticalSection(&m_cs);
+	LeaveCriticalSection(&m_cs);
 }
 
 bool TCPSocket::RemoveSend(int iIndex)
 {
-    EnterCriticalSection(&m_cs);
+	EnterCriticalSection(&m_cs);
+	bool bResult = false;
 	if (iIndex < m_aSend.GetSize())
 	{
-        PACKET packet = m_aSend.GetAt(iIndex);
+		PACKET packet = m_aSend.GetAt(iIndex);
 
 		m_aSend.RemoveAt(iIndex);
-        if (packet.pszData)
-        {
-            delete[] packet.pszData;
-            packet.pszData = nullptr;
-        }
-		return true;
+		if (packet.pszData)
+		{
+			delete[] packet.pszData;
+			packet.pszData = nullptr;
+		}
+		bResult = true;
 	}
-	return false;
-    LeaveCriticalSection(&m_cs);
+	LeaveCriticalSection(&m_cs);
+	return bResult;
+
+}
+
+void TCPSocket::RemoveAllSend()
+{
+	for (int i = 0; i < m_aSend.GetCount(); i++)
+	{
+		PACKET packet = m_aSend.GetAt(i);
+		m_aSend.RemoveAt(i);
+
+		if (packet.pszData)
+		{
+			delete[] packet.pszData;
+			packet.pszData = nullptr;
+		}
+	}
 }
 
 void TCPSocket::Send()
 {
-    CString sValue;
-    const int iSendCount = m_aSend.GetCount();
-    if (iSendCount > 0)
-    {
-        for (int i = 0; i < iSendCount; i++)
-        {
-            PACKET packet = m_aSend.GetAt(i);
-            if (packet.pszData && packet.uiSize > 0)
-            {
-                int iSendSize = send(m_sock, packet.pszData, packet.uiSize, 0);
+	CString sValue;
+	const int iSend = m_aSend.GetCount();
+	if (iSend > 0)
+	{
+		PACKET packet = m_aSend.GetAt(0);
+		int iSendSize = send(m_sock, packet.pszData, packet.uiSize, 0);
 
-                if (iSendSize > 0)
-                {
-                    sValue.Format(_T("[Client] %d 소켓 %d 바이트 Send 성공"), m_sock, iSendSize);
-                }
-                else
-                {
-                    sValue.Format(_T("[Client] %d 소켓 Send 실패 (코드 %d)"), m_sock, WSAGetLastError());
-                }
+		if (iSendSize > 0)
+		{
+			sValue.Format(_T("[Client][Send] %d 소켓 %d 바이트\n"), m_sock, iSendSize);
+		}
+		else
+		{
+			sValue.Format(_T("[Client][Send] %d 소켓 실패코드 %d\n"), m_sock, WSAGetLastError());
+		}
 
-                if (m_fCallback) m_fCallback(NETWORK_EVENT::Send, m_sock, sValue);
-            }
+		if (m_fcbCommon) m_fcbCommon(NETWORK_EVENT::Send, packet, m_sock, sValue);
+		RemoveSend(0);
+	}
+}
 
-            if (RemoveSend(i)) i -= 1;
-        }
-    }
+void TCPSocket::Read()
+{
+	CString sValue;
+	char buf[MAX_BUF];
+	int iRecv = recv(m_sock, buf, MAX_BUF, 0);
+
+	if (iRecv > 0)
+	{
+		sValue.Format(_T("[Client][Recv] %d 소켓 %d 바이트\n"), m_sock, iRecv);
+	}
+	else
+	{
+		sValue.Format(_T("[Client][Recv] %d 소켓 실패코드 %d\n"), m_sock, WSAGetLastError());
+	}
+
+	PACKET packet;
+	memset(&packet, 0x00, sizeof(PACKET));
+
+	if (iRecv > 0)
+	{
+		packet.pszData = buf;
+		packet.uiSize = iRecv;
+		UseCallback(NETWORK_EVENT::Recv, packet, m_sock, sValue);
+	}
+	else
+	{
+		UseCallback(NETWORK_EVENT::Error, {}, m_sock, sValue);
+	}
+}
+
+
+void TCPSocket::UseCallback(const NETWORK_EVENT eEvent, const PACKET packet, const int iSocket, const CString& sValue) const
+{
+	if (m_fcbCommon)
+	{
+		OutputDebugString(sValue);
+		m_fcbCommon(eEvent, packet, iSocket, sValue);
+	}
 }

@@ -22,8 +22,13 @@ enum class NETWORK_EVENT
 typedef struct PACKET
 {
 	char* pszData;
+	int iOPCode;
 	UINT uiSize;
-}PACKET, *PACKET_PTR;
+}PACKET, * PACKET_PTR;
+
+constexpr int MAX_BUF = 1024;
+using CommonCallback = void(*)(NETWORK_EVENT, PACKET, int, CString);
+using SendCallback = void(*)(NETWORK_EVENT, int, CString, PACKET);
 
 class TCPSocket
 {
@@ -33,7 +38,8 @@ public:
 
 public:
 	void SetIPPort(const CString& sIP, const UINT uiPort) { m_sIP = sIP; m_uiPort = uiPort; }
-	void SetCallback(void (*pCallback)(NETWORK_EVENT, int, CString)) { m_fCallback = pCallback; }
+	void SetCommonCallback(CommonCallback pCb) { m_fcbCommon = pCb; }
+	void SetSendCallback(SendCallback pCb) { m_fcbSend = pCb; }
 	int GetSocket() const { return m_sock; }
 	void SetKey(const int iKey) { m_iKey = iKey; }
 	int GetKey() const { return m_iKey; }
@@ -46,19 +52,22 @@ protected:
 	void Clear();		//리소스 정리
 	virtual bool MakeNonBlockingSocket() = NULL;
 	bool RemoveSend(int iIndex);
+	void RemoveAllSend();
 	void Send();
+	void Read();
 	void SetInit(const bool bInit) { m_bInit = bInit; }
 	bool GetInit() const { return m_bInit; }
+	void UseCallback(NETWORK_EVENT eEvent, PACKET packet, int iSocket, const CString& sValue) const;
 
 protected:
-	CString m_sIP;	
+	CString m_sIP;
 	UINT m_uiPort = -1;
-
-	bool m_bExit = false;
 	CArray<PACKET> m_aSend;
-	void (*m_fCallback)(NETWORK_EVENT, int, CString);	//콜백 함수 포인터
+	CommonCallback m_fcbCommon;
+	SendCallback m_fcbSend;
 
 	//Exit
+	bool m_bExit = false;
 	bool GetExit() const { return m_bExit; };
 	void SetExit(const bool bExit) { m_bExit = bExit; }
 
