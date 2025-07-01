@@ -12,11 +12,13 @@ WSAENOTSOCK (10038)			SOCKET ÇÚµéÀÌ ¾Æ´Ô
  */
 enum class NETWORK_EVENT
 {
-	Connect = 0,
-	Disconnect,
-	Send,
-	Recv,
-	Error,
+	CONNECT = 0,
+	DISCONNECT,
+	LISTEN,
+	ACCEPT,
+	SEND,
+	RECV,
+	NE_ERROR,
 };
 
 typedef struct PACKET
@@ -38,7 +40,8 @@ public:
 
 public:
 	void SetIPPort(const CString& sIP, const UINT uiPort) { m_sIP = sIP; m_uiPort = uiPort; }
-	void SetCommonCallback(CommonCallback pCb) { m_fcbCommon = pCb; }
+	void SetPort(const UINT uiPort) { m_uiPort = uiPort; }
+	void SetCallback(CommonCallback pCb) { m_fcbCommon = pCb; }
 	void SetSendCallback(SendCallback pCb) { m_fcbSend = pCb; }
 	int GetSocket() const { return m_sock; }
 	void SetKey(const int iKey) { m_iKey = iKey; }
@@ -53,8 +56,10 @@ protected:
 	virtual bool MakeNonBlockingSocket() = NULL;
 	bool RemoveSend(int iIndex);
 	void RemoveAllSend();
-	void Send();
-	void Read();
+	virtual void SendProc(SOCKET sock) = NULL;
+	virtual void RecvProc(SOCKET sock) = NULL;
+	virtual int Send(SOCKET sock) = NULL;
+	virtual int Read(SOCKET sock) = NULL;
 	void SetInit(const bool bInit) { m_bInit = bInit; }
 	bool GetInit() const { return m_bInit; }
 	void UseCallback(NETWORK_EVENT eEvent, PACKET packet, int iSocket, const CString& sValue) const;
@@ -76,7 +81,5 @@ protected:
 	int m_iKey;
 	bool m_bInit = false;
 	CRITICAL_SECTION m_cs;
-
-
 };
 

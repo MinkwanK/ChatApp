@@ -82,8 +82,6 @@ bool Client::ConnectProc()
         return false;
 
     CString sValue;
-    //sValue.Format(_T("Trying to connect to %s:%d...\n"), sServerIP, uiPort);
-    //OutputDebugString(sValue);
 
     while (!m_bExit)
     {
@@ -101,17 +99,17 @@ bool Client::ConnectProc()
             sValue.Format(_T("[클라이언트] 성공: %d 접속\n"), m_sock);
             OutputDebugString(sValue);
             if (m_fcbCommon)
-                m_fcbCommon(NETWORK_EVENT::Connect, {}, m_sock, sValue);
+                m_fcbCommon(NETWORK_EVENT::CONNECT, {}, m_sock, sValue);
             break;
         }
         else
         {
             if (iResult == 0)
             {
-                sValue.Format(_T("[클라이언트] 에러: StartClient Connect 타임아웃\n"));
+                sValue.Format(_T("[클라이언트] 에러: StartClient CONNECT 타임아웃\n"));
                 OutputDebugString(sValue);
                 if (m_fcbCommon)
-                    m_fcbCommon(NETWORK_EVENT::Error, {}, m_sock, sValue);
+                    m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, m_sock, sValue);
                 if (!Connect())
                 {
                     return false;
@@ -126,7 +124,7 @@ bool Client::ConnectProc()
                 OutputDebugString(sMsg);
 
                 if (m_fcbCommon)
-                    m_fcbCommon(NETWORK_EVENT::Error, {}, m_sock, sValue);
+                    m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, m_sock, sValue);
 
                 CloseSocket();
                 return false;
@@ -134,11 +132,11 @@ bool Client::ConnectProc()
         }
     }
 
-    std::thread SendThread(&Client::SendThread, this);
-    SendThread.detach();
+    std::thread sendThread(&Client::SendThread, this, m_sock);
+    sendThread.detach();
 
-    std::thread RecvThread(&Client::RecvThread, this);
-    RecvThread.detach();
+    std::thread recvThread(&Client::RecvThread, this, m_sock);
+    recvThread.detach();
 
     return true;
 }
@@ -153,8 +151,8 @@ bool Client::Connect()
         if (iError != WSAEWOULDBLOCK && iError != WSAEINPROGRESS && iError != WSAEINVAL && iError != WSAEALREADY)   //WSAEALREADY 비동기 연결 이미 시도 중...
         {
             CString sValue;
-            sValue.Format(_T("[클라이언트] 에러: StartClient Connect 시도 중 에러발생 : %d\n"), iError);
-            UseCallback(NETWORK_EVENT::Error, {}, m_sock, sValue);
+            sValue.Format(_T("[클라이언트] 에러: StartClient CONNECT 시도 중 에러발생 : %d\n"), iError);
+            UseCallback(NETWORK_EVENT::NE_ERROR, {}, m_sock, sValue);
             CloseSocket();
             return false;
         }
@@ -162,30 +160,29 @@ bool Client::Connect()
     return true;
 }
 
-bool Client::SendThread(Client* pClient)
+void Client::SendThread(Client* pClient, SOCKET sock)
 {
     if (pClient)
     {
-        return pClient->SendProc();
+        pClient->SendProc(sock);
     }
-    return false;
 }
 
-bool Client::SendProc()
+void Client::SendProc(SOCKET sock)
 {
     CString sValue;
     while (!m_bExit)
     {
-        if (m_sock == INVALID_SOCKET)
+        if (sock == INVALID_SOCKET)
         {
             sValue.Format(_T("[Client] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
-            m_fcbCommon(NETWORK_EVENT::Error, {}, m_sock, sValue);
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
             break;
         }
         // select 준비
         fd_set writeSet;
         FD_ZERO(&writeSet);
-        FD_SET(m_sock, &writeSet);
+        FD_SET(sock, &writeSet);
 
         timeval timeout;
         timeout.tv_sec = 0;
@@ -194,45 +191,76 @@ bool Client::SendProc()
         int iSelectResult = select(0, nullptr, &writeSet, nullptr, &timeout);
         if (iSelectResult == SOCKET_ERROR)
         {
-            sValue.Format(_T("[Client] Send 오류: select (%d)"), WSAGetLastError());
-            m_fcbCommon(NETWORK_EVENT::Error, {}, m_sock, sValue);
+            sValue.Format(_T("[Client] SEND 오류: select (%d)"), WSAGetLastError());
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
             break;
         }
 
         if (iSelectResult == 0) continue; // 타임아웃, 다음 루프
 
-        if (FD_ISSET(m_sock, &writeSet))
+        if (FD_ISSET(sock, &writeSet))
         {
-            Send();
+            int iResult = Send(sock);
+            if (iResult == 0)
+            {
+                //서버와의 연결이 끊김
+            }
         }
     }
-    return false;
 }
 
-bool Client::RecvThread(Client* pClient)
+int Client::Send(SOCKET sock)
+{
+    CString sValue;
+    const int iSend = m_aSend.GetCount();
+    if (iSend > 0)
+    {
+        PACKET packet = m_aSend.GetAt(0);
+        int iSendSize = send(sock, packet.pszData, packet.uiSize, 0);
+
+        if (iSendSize > 0)
+        {
+            sValue.Format(_T("[Client][SEND] %d 소켓 %d 바이트\n"), sock, iSendSize);
+        }
+        else if (iSend == 0)
+        {
+            sValue.Format(_T("[Client][SEND] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), sock);
+        }
+        else
+        {
+            sValue.Format(_T("[Client][SEND] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+        }
+
+        if (m_fcbCommon) m_fcbCommon(NETWORK_EVENT::SEND, packet, sock, sValue);
+        RemoveSend(0);
+    }
+
+    return iSend;
+}
+
+void Client::RecvThread(Client* pClient, SOCKET sock)
 {
     if (pClient)
     {
-        return pClient->RecvProc();
+        pClient->RecvProc(sock);
     }
-    return false;
 }
 
-bool Client::RecvProc()
+void Client::RecvProc(SOCKET sock)
 {
     CString sValue;
     while (!m_bExit)
     {
-        if (m_sock == INVALID_SOCKET)
+        if (sock == INVALID_SOCKET)
         {
             sValue.Format(_T("[Client] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
-            m_fcbCommon(NETWORK_EVENT::Error, {}, m_sock, sValue);
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
             break;
         }
         // select 준비
         fd_set readSet;
         FD_ZERO(&readSet);
-        FD_SET(m_sock, &readSet);
+        FD_SET(sock, &readSet);
 
         timeval timeout;
         timeout.tv_sec = 0;
@@ -242,16 +270,53 @@ bool Client::RecvProc()
         if (iSelectResult == SOCKET_ERROR)
         {
             sValue.Format(_T("[Client] Recv 오류: select (%d)"), WSAGetLastError());
-            m_fcbCommon(NETWORK_EVENT::Error, {}, m_sock, sValue);
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
             break;
         }
 
         if (iSelectResult == 0) continue; // 타임아웃, 다음 루프
 
-        if (FD_ISSET(m_sock, &readSet))
+        if (FD_ISSET(sock, &readSet))
         {
-            Read();
+            int iResult = Read(sock);
+            if (iResult == 0)
+            {
+                //서버와의 연결이 끊어짐.
+            }
         }
     }
-    return false;
+}
+
+int Client::Read(SOCKET sock)
+{
+    CString sValue;
+    char buf[MAX_BUF];
+    int iRecv = recv(sock, buf, MAX_BUF, 0);
+
+    if (iRecv > 0)
+    {
+        sValue.Format(_T("[Client][RECV] %d 소켓 %d 바이트\n"), sock, iRecv);
+    }
+    else if (iRecv == 0)
+    {
+        sValue.Format(_T("[Client][RECV] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), sock);
+    }
+    else
+    {
+        sValue.Format(_T("[Client][RECV] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+    }
+
+    PACKET packet = {};
+
+    if (iRecv > 0)
+    {
+        packet.pszData = buf;
+        packet.uiSize = iRecv;
+        UseCallback(NETWORK_EVENT::RECV, packet, sock, sValue);
+    }
+    else
+    {
+        UseCallback(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+    }
+    return iRecv;
 }

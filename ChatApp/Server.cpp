@@ -29,56 +29,54 @@ bool Server::MakeNonBlockingSocket()
     // 2. TCP 소켓 생성
     m_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_sock == INVALID_SOCKET) {
-        std::cerr << "Socket creation failed.\n";
+        sValue = _T("[Server] Socket creation failed.\n");
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, -1, sValue);
         return false;
     }
 
     // 3. 소켓을 논블로킹 모드로 설정
     u_long mode = 1;  // 1이면 non-blocking
     if (ioctlsocket(m_sock, FIONBIO, &mode) != 0) {
-        std::cerr << "ioctlsocket failed.\n";
+        sValue = _T("[Server] ioctlsocket failed.\n");
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
         Clear();
         return false;
     }
 
     // 4. 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택)
     sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;                        // IPv4 사용
-    serverAddr.sin_addr.s_addr = INADDR_ANY;                // 모든 IP에서 수신
-	serverAddr.sin_port = m_uiPort == -1 ? 0 : m_uiPort;    // 포트 0 -> OS가 가용 포트 자동 할당
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = m_uiPort == -1 ? 0 : htons(m_uiPort);
 
-     // 5. 바인딩 (소켓을 IP/포트에 연결) 
+    // 5. 바인딩
     if (bind(m_sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cerr << "Bind failed.\n";
+        sValue = _T("[Server] Bind failed.\n");
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
         Clear();
         return false;
     }
 
     // 6. 실제 할당된 포트 번호 얻기
     int addrLen = sizeof(serverAddr);
-    if (getsockname(m_sock, (SOCKADDR*)&serverAddr, &addrLen) == 0) 
+    if (getsockname(m_sock, (SOCKADDR*)&serverAddr, &addrLen) == 0)
     {
-        sValue.Format(_T("Server port: %d\n"), ntohs(serverAddr.sin_port));
+        sValue.Format(_T("[Server] port: %d\n"), ntohs(serverAddr.sin_port));
         OutputDebugString(sValue);
     }
 
     return true;
 }
 
-bool Server::StartServer(UINT uiPort /*= -1*/)
+bool Server::StartServer()
 {
-    if (uiPort > 0)
-        m_uiPort = uiPort;
-
     if (!MakeNonBlockingSocket())   //논블로킹 소켓 생성
     {
-        AfxMessageBox(_T("서버 소켓 생성 실패"));
         return false;
     }
-        
-    if (!listen)    //리스닝
+
+    if (!Listen())    //리스닝
     {
-        AfxMessageBox(_T("서버 리스닝 실패"));
         return false;
     }
 
@@ -89,13 +87,18 @@ bool Server::StartServer(UINT uiPort /*= -1*/)
 
 bool Server::Listen()
 {
-        // 7. 리스닝 시작
-     if (listen(GetSocket(), SOMAXCONN) == SOCKET_ERROR) {
-         OutputDebugString(_T("Listen Failed\n"));
-         Clear();
-         return false;
-     }
-     return true;
+    CString sValue;
+
+    if (listen(GetSocket(), SOMAXCONN) == SOCKET_ERROR)
+    {
+        sValue.Format(_T("[Server] Listen Failed\n"));
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
+        Clear();
+        return false;
+    }
+    sValue.Format(_T("[Server] Port: %d Listen\n"), m_uiPort);
+    UseCallback(NETWORK_EVENT::LISTEN, PACKET{}, m_sock, sValue);
+    return true;
 }
 
 bool Server::Accept(Server* pServer)
@@ -109,41 +112,212 @@ bool Server::Accept(Server* pServer)
 
 bool Server::Acceptproc()
 {
-    CString sValue;
     m_accepting = true;
+
     // 논블로킹 방식으로 클라이언트 수신 대기 (select 사용)
     while (!m_bExit)    //클라이언트 연결을 기다림 
     {
         fd_set readfds;                  // 감시할 소켓 목록 선언
         FD_ZERO(&readfds);              // 목록 초기화
-        FD_SET(m_sock, &readfds);  // 감시할 소켓 등록
+        FD_SET(m_sock, &readfds);       // 감시할 소켓 등록
 
         timeval timeout{};
         timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
 
         /*
         select(): 지정한 소켓이 읽기/쓰기/예외 처리가 가능한지 감지, 블로킹 함수
         FD_ISSET은 해당 소켓이 실제로 이벤트가 감지됐는지 확인
         select를 통해 소켓이 읽을 준비가 됐을 때만 처리, cpu를 거의 쓰지 않음
         */
-        int result = select(0, &readfds, NULL, NULL, &timeout);
+        int result = select(0, &readfds, nullptr, nullptr, &timeout);
         if (result > 0 && FD_ISSET(m_sock, &readfds))   //감지되면 클라이언트 연결 요청이 있다는 뜻
         {
-            SOCKET clientSock = accept(m_sock, NULL, NULL);
+            SOCKET clientSock = accept(m_sock, nullptr, nullptr);
             if (clientSock != INVALID_SOCKET)
             {
-                sValue.Format(_T("%d 클라이언트 소켓 접속 완료\n"), clientSock);
-                OutputDebugString(sValue);
-                AfxMessageBox(sValue);
-                return TRUE;
+                CString sMsg;
+                sMsg.Format(_T("[Server] 클라이언트 접속 완료 (소켓: %d)\n"), clientSock);
+                UseCallback(NETWORK_EVENT::ACCEPT, PACKET{}, clientSock, sMsg);
+
+                std::thread sendThread(&Server::SendThread, this, clientSock);
+                sendThread.detach();
+
+                std::thread recvThread(&Server::RecvThread, this, clientSock);
+                recvThread.detach();
             }
+            else
+            {
+                UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, _T("[Server] Accept() 실패"));
+            }
+        }
+        else if (result == SOCKET_ERROR)
+        {
+            UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, _T("[Server] Accept select() 실패"));
+            break; // 에러 발생 시 루프 탈출
         }
         else
         {
-            OutputDebugString(_T("Server: Select Failed\n"));
+            //timeout   
         }
     }
     m_accepting = false;
     return FALSE;
+}
+
+void Server::SendThread(Server* pServer, SOCKET sock)
+{
+    if (pServer)
+    {
+        pServer->SendProc(sock);
+    }
+}
+
+void Server::SendProc(SOCKET sock)
+{
+    CString sValue;
+    while (!m_bExit)
+    {
+        if (sock == INVALID_SOCKET)
+        {
+            sValue.Format(_T("[Server] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+            break;
+        }
+        // select 준비
+        fd_set writeSet;
+        FD_ZERO(&writeSet);
+        FD_SET(sock, &writeSet);
+
+        timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 1000 * 1000; // 1초 대기
+
+        int iSelectResult = select(0, nullptr, &writeSet, nullptr, &timeout);
+        if (iSelectResult == SOCKET_ERROR)
+        {
+            sValue.Format(_T("[Server] SEND 오류: select (%d)"), WSAGetLastError());
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+            break;
+        }
+
+        if (iSelectResult == 0) continue; // 타임아웃, 다음 루프
+
+        if (FD_ISSET(sock, &writeSet))
+        {
+            const int iResult = Send(sock);
+            if (iResult == 0)
+                break;          //연결 끊김
+        }
+    }
+}
+
+int Server::Send(SOCKET sock)
+{
+    CString sValue;
+    const int iSend = m_aSend.GetCount();
+    if (iSend > 0)
+    {
+        PACKET packet = m_aSend.GetAt(0);
+        int iSend = send(sock, packet.pszData, packet.uiSize, 0);
+
+        if (iSend > 0)
+        {
+            sValue.Format(_T("[Server][SEND] %d 소켓 %d 바이트\n"), sock, iSend);
+        }
+        else if (iSend == 0)
+        {
+            sValue.Format(_T("[Server][SEND] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), sock);
+        }
+        else
+        {
+            sValue.Format(_T("[Server][SEND] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+        }
+
+        if (m_fcbCommon) m_fcbCommon(NETWORK_EVENT::SEND, packet, sock, sValue);
+        RemoveSend(0);
+    }
+
+    return iSend;
+}
+
+void Server::RecvThread(Server* pServer, SOCKET sock)
+{
+    if (pServer)
+    {
+        pServer->RecvProc(sock);
+    }
+}
+
+void Server::RecvProc(SOCKET sock)
+{
+    CString sValue;
+    while (!m_bExit)
+    {
+        if (sock == INVALID_SOCKET)
+        {
+            sValue.Format(_T("[Server] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+            break;
+        }
+
+        // select 준비
+        fd_set readSet;
+        FD_ZERO(&readSet);
+        FD_SET(sock, &readSet);
+
+        timeval timeout;
+        timeout.tv_sec = 1;
+
+        int iSelectResult = select(0, &readSet, nullptr, nullptr, &timeout);
+        if (iSelectResult == SOCKET_ERROR)
+        {
+            sValue.Format(_T("[Server] Recv 오류: select (%d)"), WSAGetLastError());
+            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+            break;
+        }
+
+        if (iSelectResult == 0) continue; // 타임아웃, 다음 루프
+
+        if (FD_ISSET(sock, &readSet))
+        {
+            const int iResult = Read(sock);
+            if (iResult == 0)
+                break;
+        }
+    }
+}
+
+int Server::Read(SOCKET sock)
+{
+    CString sValue;
+    char buf[MAX_BUF];
+    int iRecv = recv(sock, buf, MAX_BUF, 0);
+
+    if (iRecv > 0)
+    {
+        sValue.Format(_T("[Server][RECV] %d 소켓 %d 바이트\n"), sock, iRecv);
+    }
+    else if (iRecv == 0)
+    {
+        sValue.Format(_T("[Server][RECV] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), sock);
+    }
+    else
+    {
+        sValue.Format(_T("[Server][RECV] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+    }
+
+    PACKET packet = {};
+
+    if (iRecv > 0)
+    {
+        packet.pszData = buf;
+        packet.uiSize = iRecv;
+        UseCallback(NETWORK_EVENT::RECV, packet, sock, sValue);
+    }
+    else
+    {
+        UseCallback(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+    }
+
+    return iRecv;
 }

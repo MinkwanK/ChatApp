@@ -13,18 +13,21 @@ protected:
 	//Socket
 	bool MakeNonBlockingSocket() override;
 
-	//Connect
+	//CONNECT
 	static bool ConnectThread(Client* pClient);
 	bool ConnectProc();
 	bool Connect();
 
-	//Send
-	static bool SendThread(Client* pClient);
-	bool SendProc();
+	//SEND
+	static void SendThread(Client* pClient, SOCKET sock);
+	void SendProc(SOCKET sock) override;
+	int Send(SOCKET sock) override;
 
-	//Recv
-	static bool RecvThread(Client* pClient);
-	bool RecvProc();
+	//RECV
+	static void RecvThread(Client* pClient, SOCKET sock);
+	void RecvProc(SOCKET sock) override;
+	int Read(SOCKET sock) override;
+
 
 private:
 	sockaddr_in m_serverAddr{}; //접속 대상 서버의 sockaddr_in

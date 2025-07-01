@@ -92,60 +92,6 @@ void TCPSocket::RemoveAllSend()
 	}
 }
 
-void TCPSocket::Send()
-{
-	CString sValue;
-	const int iSend = m_aSend.GetCount();
-	if (iSend > 0)
-	{
-		PACKET packet = m_aSend.GetAt(0);
-		int iSendSize = send(m_sock, packet.pszData, packet.uiSize, 0);
-
-		if (iSendSize > 0)
-		{
-			sValue.Format(_T("[Client][Send] %d 소켓 %d 바이트\n"), m_sock, iSendSize);
-		}
-		else
-		{
-			sValue.Format(_T("[Client][Send] %d 소켓 실패코드 %d\n"), m_sock, WSAGetLastError());
-		}
-
-		if (m_fcbCommon) m_fcbCommon(NETWORK_EVENT::Send, packet, m_sock, sValue);
-		RemoveSend(0);
-	}
-}
-
-void TCPSocket::Read()
-{
-	CString sValue;
-	char buf[MAX_BUF];
-	int iRecv = recv(m_sock, buf, MAX_BUF, 0);
-
-	if (iRecv > 0)
-	{
-		sValue.Format(_T("[Client][Recv] %d 소켓 %d 바이트\n"), m_sock, iRecv);
-	}
-	else
-	{
-		sValue.Format(_T("[Client][Recv] %d 소켓 실패코드 %d\n"), m_sock, WSAGetLastError());
-	}
-
-	PACKET packet;
-	memset(&packet, 0x00, sizeof(PACKET));
-
-	if (iRecv > 0)
-	{
-		packet.pszData = buf;
-		packet.uiSize = iRecv;
-		UseCallback(NETWORK_EVENT::Recv, packet, m_sock, sValue);
-	}
-	else
-	{
-		UseCallback(NETWORK_EVENT::Error, {}, m_sock, sValue);
-	}
-}
-
-
 void TCPSocket::UseCallback(const NETWORK_EVENT eEvent, const PACKET packet, const int iSocket, const CString& sValue) const
 {
 	if (m_fcbCommon)
