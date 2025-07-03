@@ -44,7 +44,7 @@ public:
 public:
 	void Init();
 	void AddChat(CString sChat);
-	static void CallBackHandler(CString sValue);	
+	static void CallBackHandler(NETWORK_EVENT, PACKET, int, CString);
 
 public:
 	afx_msg void OnBnClickedButtonServer();

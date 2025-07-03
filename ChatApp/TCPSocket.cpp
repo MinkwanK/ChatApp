@@ -12,6 +12,7 @@ TCPSocket::TCPSocket()
 {
 	InitWinSocket();
 	InitializeCriticalSection(&m_cs);
+	m_hExit = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
 TCPSocket::~TCPSocket()
@@ -44,7 +45,7 @@ void TCPSocket::CloseSocket()
 
 void TCPSocket::Clear()
 {
-	m_bExit = TRUE;
+	m_bExitProccess = TRUE;
 	CloseSocket();
 	CloseWinSocket();
 }
@@ -79,6 +80,7 @@ bool TCPSocket::RemoveSend(int iIndex)
 
 void TCPSocket::RemoveAllSend()
 {
+	EnterCriticalSection(&m_cs);
 	for (int i = 0; i < m_aSend.GetCount(); i++)
 	{
 		PACKET packet = m_aSend.GetAt(i);
@@ -90,6 +92,7 @@ void TCPSocket::RemoveAllSend()
 			packet.pszData = nullptr;
 		}
 	}
+	LeaveCriticalSection(&m_cs);
 }
 
 void TCPSocket::UseCallback(const NETWORK_EVENT eEvent, const PACKET packet, const int iSocket, const CString& sValue) const

@@ -22,6 +22,11 @@ bool Client::MakeNonBlockingSocket()
 {
     CString sValue;
 
+    if (m_sock)
+    {
+        closesocket(m_sock);
+        m_sock = NULL;
+    }
     // 1. 소켓 생성
     m_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_sock == INVALID_SOCKET) {
@@ -58,7 +63,7 @@ bool Client::StartClient()
         OutputDebugString(_T("클라이언트 StartClient 위한 소켓 생성 실패\n"));
     }
 
-    std::thread ConnectThread(Client::ConnectThread, this);
+    std::thread ConnectThread(&Client::ConnectThread, this);
     ConnectThread.detach();
     return TRUE;
 }
@@ -83,7 +88,7 @@ bool Client::ConnectProc()
 
     CString sValue;
 
-    while (!m_bExit)
+    while (!m_bExitProccess)
     {
         fd_set writeSet;
         FD_ZERO(&writeSet);
@@ -171,8 +176,14 @@ void Client::SendThread(Client* pClient, SOCKET sock)
 void Client::SendProc(SOCKET sock)
 {
     CString sValue;
-    while (!m_bExit)
+    while (!m_bExitProccess)
     {
+        DWORD dwResult = WaitForSingleObject(m_hExit, 100);
+        if (dwResult == WAIT_OBJECT_0)
+        {
+            break;
+        }
+
         if (sock == INVALID_SOCKET)
         {
             sValue.Format(_T("[Client] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
@@ -203,7 +214,10 @@ void Client::SendProc(SOCKET sock)
             int iResult = Send(sock);
             if (iResult == 0)
             {
-                //서버와의 연결이 끊김
+                SetEvent(m_hExit);
+                RemoveAllSend();
+                StartClient();
+                break;
             }
         }
     }
@@ -211,16 +225,18 @@ void Client::SendProc(SOCKET sock)
 
 int Client::Send(SOCKET sock)
 {
+    EnterCriticalSection(&m_cs);
     CString sValue;
-    const int iSend = m_aSend.GetCount();
-    if (iSend > 0)
+    const int iSendCount = m_aSend.GetCount();
+    int iSend = -1;
+    if (iSendCount > 0)
     {
         PACKET packet = m_aSend.GetAt(0);
-        int iSendSize = send(sock, packet.pszData, packet.uiSize, 0);
+        iSend = send(sock, packet.pszData, packet.uiSize, 0);
 
-        if (iSendSize > 0)
+        if (iSend > 0)
         {
-            sValue.Format(_T("[Client][SEND] %d 소켓 %d 바이트\n"), sock, iSendSize);
+            sValue.Format(_T("[Client][SEND] %d 소켓 %d 바이트\n"), sock, iSend);
         }
         else if (iSend == 0)
         {
@@ -231,10 +247,10 @@ int Client::Send(SOCKET sock)
             sValue.Format(_T("[Client][SEND] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
         }
 
-        if (m_fcbCommon) m_fcbCommon(NETWORK_EVENT::SEND, packet, sock, sValue);
+        UseCallback(NETWORK_EVENT::SEND, packet, sock, sValue);
         RemoveSend(0);
     }
-
+    LeaveCriticalSection(&m_cs);
     return iSend;
 }
 
@@ -249,8 +265,14 @@ void Client::RecvThread(Client* pClient, SOCKET sock)
 void Client::RecvProc(SOCKET sock)
 {
     CString sValue;
-    while (!m_bExit)
+    while (!m_bExitProccess)
     {
+        DWORD dwResult = WaitForSingleObject(m_hExit, 100);
+        if (dwResult == WAIT_OBJECT_0)
+        {
+            break;
+        }
+
         if (sock == INVALID_SOCKET)
         {
             sValue.Format(_T("[Client] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
@@ -281,7 +303,10 @@ void Client::RecvProc(SOCKET sock)
             int iResult = Read(sock);
             if (iResult == 0)
             {
-                //서버와의 연결이 끊어짐.
+                SetEvent(m_hExit);
+                RemoveAllSend();
+                StartClient();
+                break;
             }
         }
     }

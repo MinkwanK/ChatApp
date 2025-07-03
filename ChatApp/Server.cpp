@@ -115,7 +115,7 @@ bool Server::Acceptproc()
     m_accepting = true;
 
     // 논블로킹 방식으로 클라이언트 수신 대기 (select 사용)
-    while (!m_bExit)    //클라이언트 연결을 기다림 
+    while (!m_bExitProccess)    //클라이언트 연결을 기다림 
     {
         fd_set readfds;                  // 감시할 소켓 목록 선언
         FD_ZERO(&readfds);              // 목록 초기화
@@ -147,12 +147,12 @@ bool Server::Acceptproc()
             }
             else
             {
-                UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, _T("[Server] Accept() 실패"));
+                UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, _T("[Server] Accept() 실패\n"));
             }
         }
         else if (result == SOCKET_ERROR)
         {
-            UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, _T("[Server] Accept select() 실패"));
+            UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, _T("[Server] Accept select() 실패\n"));
             break; // 에러 발생 시 루프 탈출
         }
         else
@@ -174,9 +174,16 @@ void Server::SendThread(Server* pServer, SOCKET sock)
 
 void Server::SendProc(SOCKET sock)
 {
+    OutputDebugString(_T("[Server] Send Thread Start\n"));
     CString sValue;
-    while (!m_bExit)
+    while (!m_bExitProccess)
     {
+        DWORD dwResult = WaitForSingleObject(m_hExit, 100);
+        if (dwResult == WAIT_OBJECT_0)
+        {
+            break;
+        }
+
         if (sock == INVALID_SOCKET)
         {
             sValue.Format(_T("[Server] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
@@ -206,19 +213,27 @@ void Server::SendProc(SOCKET sock)
         {
             const int iResult = Send(sock);
             if (iResult == 0)
-                break;          //연결 끊김
+            {
+                OutputDebugString(_T("[Server] Send 가 0이므로 Exit 이벤트 발동\n"));
+                SetEvent(m_hExit);
+                RemoveAllSend();
+                break;
+            }
         }
     }
+    OutputDebugString(_T("[Server] Send Thread End\n"));
 }
 
 int Server::Send(SOCKET sock)
 {
+    EnterCriticalSection(&m_cs);
     CString sValue;
-    const int iSend = m_aSend.GetCount();
-    if (iSend > 0)
+    const int iSendCount = m_aSend.GetCount();
+    int iSend = -1;
+    if (iSendCount > 0)
     {
         PACKET packet = m_aSend.GetAt(0);
-        int iSend = send(sock, packet.pszData, packet.uiSize, 0);
+        iSend = send(sock, packet.pszData, packet.uiSize, 0);
 
         if (iSend > 0)
         {
@@ -233,10 +248,11 @@ int Server::Send(SOCKET sock)
             sValue.Format(_T("[Server][SEND] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
         }
 
-        if (m_fcbCommon) m_fcbCommon(NETWORK_EVENT::SEND, packet, sock, sValue);
+        UseCallback(NETWORK_EVENT::SEND, packet, sock, sValue);
         RemoveSend(0);
     }
 
+    LeaveCriticalSection(&m_cs);
     return iSend;
 }
 
@@ -250,9 +266,16 @@ void Server::RecvThread(Server* pServer, SOCKET sock)
 
 void Server::RecvProc(SOCKET sock)
 {
+    OutputDebugString(_T("[Server] Recv Thread Start\n"));
     CString sValue;
-    while (!m_bExit)
+    while (!m_bExitProccess)
     {
+        DWORD dwResult = WaitForSingleObject(m_hExit, 100);
+        if (dwResult == WAIT_OBJECT_0)
+        {
+            break;
+        }
+
         if (sock == INVALID_SOCKET)
         {
             sValue.Format(_T("[Server] 오류: 유효하지 않은 소켓 (%d)"), WSAGetLastError());
@@ -272,7 +295,7 @@ void Server::RecvProc(SOCKET sock)
         if (iSelectResult == SOCKET_ERROR)
         {
             sValue.Format(_T("[Server] Recv 오류: select (%d)"), WSAGetLastError());
-            m_fcbCommon(NETWORK_EVENT::NE_ERROR, {}, sock, sValue);
+            UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, sock, sValue);
             break;
         }
 
@@ -282,9 +305,14 @@ void Server::RecvProc(SOCKET sock)
         {
             const int iResult = Read(sock);
             if (iResult == 0)
+            {
+                SetEvent(m_hExit);
+                RemoveAllSend();
                 break;
+            }
         }
     }
+    OutputDebugString(_T("[Server] Recv Thread End\n"));
 }
 
 int Server::Read(SOCKET sock)

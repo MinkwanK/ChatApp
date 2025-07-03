@@ -72,14 +72,17 @@ protected:
 	SendCallback m_fcbSend;
 
 	//Exit
-	bool m_bExit = false;
-	bool GetExit() const { return m_bExit; };
-	void SetExit(const bool bExit) { m_bExit = bExit; }
+	bool m_bExitProccess = false;
+	bool GetExit() const { return m_bExitProccess; }
+	void SetExit(const bool bExit) { m_bExitProccess = bExit; }
+	HANDLE m_hExit = nullptr;
 
 protected:
 	SOCKET m_sock;
 	int m_iKey;
 	bool m_bInit = false;
 	CRITICAL_SECTION m_cs;
+
+
 };
 

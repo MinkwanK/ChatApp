@@ -170,9 +170,8 @@ void CChatAppDlg::Init()
 	m_ipServer.SetWindowText(_T("127.0.0.1"));
 	m_edPort.SetWindowText(_T("9000"));
 
-	//m_server.SetCallback(CallBackHandler);
-	//m_client.SetCallback(CallBackHandler);
-	
+	m_server.SetCallback(CallBackHandler);
+	m_client.SetCallback(CallBackHandler);
 }
 
 void CChatAppDlg::AddChat(CString sChat)
@@ -184,7 +183,7 @@ void CChatAppDlg::AddChat(CString sChat)
 //static 함수는 클래스 안에 있어도 일반 함수 취급
 //메모리 상에 독립적으로 존재
 //일반 함수 포인터에 그대로 대깁 가능
-void CChatAppDlg::CallBackHandler(CString sValue)
+void CChatAppDlg::CallBackHandler(NETWORK_EVENT eEvent, PACKET packet, int iSocket, CString sValue)
 {
 	if (m_pInstance)
 	{
@@ -194,7 +193,7 @@ void CChatAppDlg::CallBackHandler(CString sValue)
 
 void CChatAppDlg::OnBnClickedButtonServer()
 {
-	if (!m_server.GetAccept())
+	if (!m_server.StartServer())
 	{
 		SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
 		if (m_server.StartServer())
@@ -205,7 +204,7 @@ void CChatAppDlg::OnBnClickedButtonServer()
 	}
 	else
 	{
-		m_server.SetExit(TRUE);
+		//m_server.SetExit(TRUE);
 		SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
 	}
 }
@@ -213,14 +212,15 @@ void CChatAppDlg::OnBnClickedButtonServer()
 
 void CChatAppDlg::OnBnClickedButtonConnect()
 {
-	m_server.SetExit(TRUE);								//서버 중지
+	//m_server.SetExit(TRUE);								//서버 중지
 	SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
 
 	CString sServerIP, sServerPort;
-	UINT uiPort;
 	m_ipServer.GetWindowText(sServerIP);
 	m_edPort.GetWindowText(sServerPort);
-	if(m_client.Connect(sServerIP, _ttoi(sServerPort)))
+
+	m_client.SetIPPort(sServerIP, _ttoi(sServerPort));
+	if(m_client.StartClient())
 	{
 		AddChat(CString(_T("클라이언트 접속 중...")));
 	}
@@ -232,7 +232,14 @@ void CChatAppDlg::OnBnClickedButtonSend()
 {
 	CString sSend;
 	GetDlgItemText(IDC_EDIT_INPUT, sSend);
-	m_client.AddSend(sSend);
+
+	PACKET packet;
+	packet.uiSize = sSend.GetLength() + 1;
+	packet.pszData = new char[sSend.GetLength() + 1];
+	ZeroMemory(packet.pszData, packet.uiSize);
+	memcpy_s(packet.pszData, packet.uiSize, sSend, sSend.GetLength());
+
+	m_client.AddSend(packet);
 	sSend.Format(_T("나: %s"), sSend);
 	AddChat(sSend);
 }
