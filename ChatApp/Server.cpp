@@ -26,7 +26,7 @@ bool Server::MakeNonBlockingSocket()
 {
     CString sValue;
 
-    // 2. TCP 소켓 생성
+    // TCP 소켓 생성
     m_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_sock == INVALID_SOCKET) {
         sValue = _T("[Server] Socket creation failed.\n");
@@ -34,7 +34,7 @@ bool Server::MakeNonBlockingSocket()
         return false;
     }
 
-    // 3. 소켓을 논블로킹 모드로 설정
+    // 소켓을 논블로킹 모드로 설정
     u_long mode = 1;  // 1이면 non-blocking
     if (ioctlsocket(m_sock, FIONBIO, &mode) != 0) {
         sValue = _T("[Server] ioctlsocket failed.\n");
@@ -43,13 +43,13 @@ bool Server::MakeNonBlockingSocket()
         return false;
     }
 
-    // 4. 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택)
+    // 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택)
     sockaddr_in serverAddr{};
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = m_uiPort == -1 ? 0 : htons(m_uiPort);
 
-    // 5. 바인딩
+    // 바인딩
     if (bind(m_sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
         sValue = _T("[Server] Bind failed.\n");
         UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
@@ -57,12 +57,11 @@ bool Server::MakeNonBlockingSocket()
         return false;
     }
 
-    // 6. 실제 할당된 포트 번호 얻기
+    // 실제 할당된 포트 번호 얻기
     int addrLen = sizeof(serverAddr);
     if (getsockname(m_sock, (SOCKADDR*)&serverAddr, &addrLen) == 0)
     {
-        sValue.Format(_T("[Server] port: %d\n"), ntohs(serverAddr.sin_port));
-        OutputDebugString(sValue);
+        m_uiPort = ntohs(serverAddr.sin_port);
     }
 
     return true;

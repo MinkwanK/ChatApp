@@ -51,8 +51,9 @@ public:
 	afx_msg void OnBnClickedButtonConnect();
 	afx_msg void OnBnClickedButtonSend();
 
-public:
+private:
+	//윈도우 컨트롤
 	CIPAddressCtrl m_ipServer;
 	CEdit m_edPort;
-	CEdit m_edChatBox;
+	CListBox m_lstChat;
 };

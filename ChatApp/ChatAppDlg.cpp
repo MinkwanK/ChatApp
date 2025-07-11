@@ -62,9 +62,9 @@ CChatAppDlg::CChatAppDlg(CWnd* pParent /*=nullptr*/)
 void CChatAppDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_EDIT_CHATBOX, m_edChatBox);
 	DDX_Control(pDX, IDC_IPADDRESS1, m_ipServer);
 	DDX_Control(pDX, IDC_EDIT_PORT, m_edPort);
+	DDX_Control(pDX, IDC_LIST_CHAT, m_lstChat);
 }
 
 BEGIN_MESSAGE_MAP(CChatAppDlg, CDialogEx)
@@ -166,7 +166,6 @@ HCURSOR CChatAppDlg::OnQueryDragIcon()
 
 void CChatAppDlg::Init()
 {
-	m_edChatBox.ModifyStyle(0, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN);
 	m_ipServer.SetWindowText(_T("127.0.0.1"));
 	m_edPort.SetWindowText(_T("9000"));
 
@@ -176,8 +175,7 @@ void CChatAppDlg::Init()
 
 void CChatAppDlg::AddChat(CString sChat)
 {
-	m_sChat.Append(sChat);
-	m_edChatBox.SetWindowText(m_sChat);
+	m_lstChat.AddString(sChat);
 }
 
 //static 함수는 클래스 안에 있어도 일반 함수 취급
