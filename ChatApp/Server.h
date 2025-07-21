@@ -22,7 +22,7 @@ protected:
 	//SEND
 	static void SendThread(Server* pServer, SOCKET sock);
 	void SendProc(SOCKET sock) override;
-	int Send(SOCKET sock) override;
+	int Send() override;
 
 	//RECV
 	static void RecvThread(Server* pServer, SOCKET sock);

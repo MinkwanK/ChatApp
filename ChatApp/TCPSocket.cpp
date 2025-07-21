@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "TCPSocket.h"
 
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -55,6 +56,12 @@ void TCPSocket::AddSend(PACKET packet)
 	EnterCriticalSection(&m_cs);
 	m_aSend.Add(packet);
 	LeaveCriticalSection(&m_cs);
+}
+
+void TCPSocket::SetExit()
+{
+	if (m_hExit)
+		SetEvent(m_hExit);
 }
 
 bool TCPSocket::RemoveSend(int iIndex)

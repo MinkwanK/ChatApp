@@ -8,6 +8,7 @@ public:
 
 public:
 	bool StartClient();
+	void RestartClient();
 
 protected:
 	//Socket
@@ -21,12 +22,13 @@ protected:
 	//SEND
 	static void SendThread(Client* pClient, SOCKET sock);
 	void SendProc(SOCKET sock) override;
-	int Send(SOCKET sock) override;
+	int Send() override;
 
 	//RECV
 	static void RecvThread(Client* pClient, SOCKET sock);
 	void RecvProc(SOCKET sock) override;
 	int Read(SOCKET sock) override;
+
 
 
 private:

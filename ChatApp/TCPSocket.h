@@ -23,9 +23,12 @@ enum class NETWORK_EVENT
 
 typedef struct PACKET
 {
+	SOCKET sock;
 	char* pszData;
 	int iOPCode;
 	UINT uiSize;
+
+	PACKET() : sock(INVALID_SOCKET), pszData(nullptr), iOPCode(0), uiSize(0) {}
 }PACKET, * PACKET_PTR;
 
 constexpr int MAX_BUF = 1024;
@@ -47,6 +50,9 @@ public:
 	void SetKey(const int iKey) { m_iKey = iKey; }
 	int GetKey() const { return m_iKey; }
 	void AddSend(PACKET packet);
+	bool GetRunning() { return m_bIsRunning; }
+	void SetRunning(bool bRun) { m_bIsRunning = bRun; }
+	void SetExit();
 
 protected:
 	bool InitWinSocket();
@@ -58,7 +64,7 @@ protected:
 	void RemoveAllSend();
 	virtual void SendProc(SOCKET sock) = NULL;
 	virtual void RecvProc(SOCKET sock) = NULL;
-	virtual int Send(SOCKET sock) = NULL;
+	virtual int Send() = NULL;
 	virtual int Read(SOCKET sock) = NULL;
 	void SetInit(const bool bInit) { m_bInit = bInit; }
 	bool GetInit() const { return m_bInit; }
@@ -82,6 +88,7 @@ protected:
 	int m_iKey;
 	bool m_bInit = false;
 	CRITICAL_SECTION m_cs;
+	bool m_bIsRunning = false;
 
 
 };

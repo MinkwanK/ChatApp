@@ -26,7 +26,7 @@ bool Server::MakeNonBlockingSocket()
 {
     CString sValue;
 
-    // TCP 소켓 생성
+    // 2. TCP 소켓 생성
     m_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_sock == INVALID_SOCKET) {
         sValue = _T("[Server] Socket creation failed.\n");
@@ -34,7 +34,7 @@ bool Server::MakeNonBlockingSocket()
         return false;
     }
 
-    // 소켓을 논블로킹 모드로 설정
+    // 3. 소켓을 논블로킹 모드로 설정
     u_long mode = 1;  // 1이면 non-blocking
     if (ioctlsocket(m_sock, FIONBIO, &mode) != 0) {
         sValue = _T("[Server] ioctlsocket failed.\n");
@@ -43,13 +43,13 @@ bool Server::MakeNonBlockingSocket()
         return false;
     }
 
-    // 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택)
+    // 4. 주소 구조체 설정: INADDR_ANY + 포트 0 (자동 포트 선택)
     sockaddr_in serverAddr{};
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = m_uiPort == -1 ? 0 : htons(m_uiPort);
 
-    // 바인딩
+    // 5. 바인딩
     if (bind(m_sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
         sValue = _T("[Server] Bind failed.\n");
         UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
@@ -57,11 +57,12 @@ bool Server::MakeNonBlockingSocket()
         return false;
     }
 
-    // 실제 할당된 포트 번호 얻기
+    // 6. 실제 할당된 포트 번호 얻기
     int addrLen = sizeof(serverAddr);
     if (getsockname(m_sock, (SOCKADDR*)&serverAddr, &addrLen) == 0)
     {
-        m_uiPort = ntohs(serverAddr.sin_port);
+        sValue.Format(_T("[Server] port: %d\n"), ntohs(serverAddr.sin_port));
+        OutputDebugString(sValue);
     }
 
     return true;
@@ -112,10 +113,16 @@ bool Server::Accept(Server* pServer)
 bool Server::Acceptproc()
 {
     m_accepting = true;
-
+    SetRunning(true);
     // 논블로킹 방식으로 클라이언트 수신 대기 (select 사용)
     while (!m_bExitProccess)    //클라이언트 연결을 기다림 
     {
+        //종료 이벤트 체크
+        if (WaitForSingleObject(m_hExit, 0) == WAIT_OBJECT_0)
+        {
+            break;
+        }
+
         fd_set readfds;                  // 감시할 소켓 목록 선언
         FD_ZERO(&readfds);              // 목록 초기화
         FD_SET(m_sock, &readfds);       // 감시할 소켓 등록
@@ -159,6 +166,7 @@ bool Server::Acceptproc()
             //timeout   
         }
     }
+    SetRunning(false);
     m_accepting = false;
     return FALSE;
 }
@@ -210,7 +218,7 @@ void Server::SendProc(SOCKET sock)
 
         if (FD_ISSET(sock, &writeSet))
         {
-            const int iResult = Send(sock);
+            const int iResult = Send();
             if (iResult == 0)
             {
                 OutputDebugString(_T("[Server] Send 가 0이므로 Exit 이벤트 발동\n"));
@@ -220,10 +228,11 @@ void Server::SendProc(SOCKET sock)
             }
         }
     }
+    SetRunning(false);
     OutputDebugString(_T("[Server] Send Thread End\n"));
 }
 
-int Server::Send(SOCKET sock)
+int Server::Send()
 {
     EnterCriticalSection(&m_cs);
     CString sValue;
@@ -232,22 +241,25 @@ int Server::Send(SOCKET sock)
     if (iSendCount > 0)
     {
         PACKET packet = m_aSend.GetAt(0);
-        iSend = send(sock, packet.pszData, packet.uiSize, 0);
+        SOCKET targetSock = packet.sock;  // 패킷 내에 있는 정확한 소켓 사용
 
-        if (iSend > 0)
+        if (targetSock != INVALID_SOCKET)
         {
-            sValue.Format(_T("[Server][SEND] %d 소켓 %d 바이트\n"), sock, iSend);
-        }
-        else if (iSend == 0)
-        {
-            sValue.Format(_T("[Server][SEND] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), sock);
-        }
-        else
-        {
-            sValue.Format(_T("[Server][SEND] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+            iSend = send(targetSock, packet.pszData, packet.uiSize, 0);
+
+            if (iSend > 0)
+                sValue.Format(_T("[Server][SEND] %d 소켓 %d 바이트\n"), targetSock, iSend);
+            else if (iSend == 0)
+                sValue.Format(_T("[Server][SEND] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), targetSock);
+            else
+            {
+                sValue.Format(_T("[Server][SEND] %d 소켓 실패코드 %d\n"), targetSock, WSAGetLastError());
+                return false;
+            }
+
+            UseCallback(NETWORK_EVENT::SEND, packet, targetSock, sValue);
         }
 
-        UseCallback(NETWORK_EVENT::SEND, packet, sock, sValue);
         RemoveSend(0);
     }
 
@@ -311,6 +323,7 @@ void Server::RecvProc(SOCKET sock)
             }
         }
     }
+    SetRunning(false);
     OutputDebugString(_T("[Server] Recv Thread End\n"));
 }
 
@@ -331,6 +344,7 @@ int Server::Read(SOCKET sock)
     else
     {
         sValue.Format(_T("[Server][RECV] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+        return false;
     }
 
     PACKET packet = {};

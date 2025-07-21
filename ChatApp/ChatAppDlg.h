@@ -56,4 +56,6 @@ private:
 	CIPAddressCtrl m_ipServer;
 	CEdit m_edPort;
 	CListBox m_lstChat;
+public:
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };

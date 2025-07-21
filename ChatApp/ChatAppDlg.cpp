@@ -175,12 +175,22 @@ void CChatAppDlg::Init()
 
 void CChatAppDlg::AddChat(CString sChat)
 {
-	m_lstChat.AddString(sChat);
+	if (m_lstChat && ::IsWindow(m_lstChat.GetSafeHwnd()))
+	{
+		// 100개 이상이면 가장 오래된 항목 삭제
+		if (m_lstChat.GetCount() >= 100)
+		{
+			m_lstChat.DeleteString(m_lstChat.GetCount() - 1); // 가장 아래 항목 삭제
+		}
+
+		// 새 채팅을 맨 위에 추가
+		m_lstChat.InsertString(0, sChat);
+	}
 }
 
 //static 함수는 클래스 안에 있어도 일반 함수 취급
 //메모리 상에 독립적으로 존재
-//일반 함수 포인터에 그대로 대깁 가능
+//일반 함수 포인터에 그대로 대입 가능
 void CChatAppDlg::CallBackHandler(NETWORK_EVENT eEvent, PACKET packet, int iSocket, CString sValue)
 {
 	if (m_pInstance)
@@ -191,38 +201,49 @@ void CChatAppDlg::CallBackHandler(NETWORK_EVENT eEvent, PACKET packet, int iSock
 
 void CChatAppDlg::OnBnClickedButtonServer()
 {
-	if (!m_server.StartServer())
+	if (m_server.GetRunning())
 	{
+		m_server.SetExit();
 		SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
+		GetDlgItem(IDC_BUTTON_CONNECT)->EnableWindow(TRUE);
+	}
+	else
+	{
+		CString sServerIP, sServerPort;
+		m_ipServer.GetWindowText(sServerIP);
+		m_edPort.GetWindowText(sServerPort);
+		m_server.SetIPPort(sServerIP, _ttoi(sServerPort));
 		if (m_server.StartServer())
 		{
 			SetDlgItemText(IDC_BUTTON_SERVER, _T("사용자 입장 대기 중... (대기취소)"));
 			AddChat(CString(_T("사용자 입장 대기 중... (대기취소)")));
+			GetDlgItem(IDC_BUTTON_CONNECT)->EnableWindow(FALSE);
 		}
-	}
-	else
-	{
-		//m_server.SetExit(TRUE);
-		SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
 	}
 }
 
 
 void CChatAppDlg::OnBnClickedButtonConnect()
 {
-	//m_server.SetExit(TRUE);								//서버 중지
-	SetDlgItemText(IDC_BUTTON_SERVER, _T("방 생성"));
-
-	CString sServerIP, sServerPort;
-	m_ipServer.GetWindowText(sServerIP);
-	m_edPort.GetWindowText(sServerPort);
-
-	m_client.SetIPPort(sServerIP, _ttoi(sServerPort));
-	if(m_client.StartClient())
+	if (m_client.GetRunning())
 	{
-		AddChat(CString(_T("클라이언트 접속 중...")));
+		m_client.SetExit();
+		SetDlgItemText(IDC_BUTTON_CONNECT, _T("방 입장"));
+		GetDlgItem(IDC_BUTTON_SERVER)->EnableWindow(TRUE);
 	}
-
+	else
+	{
+		CString sServerIP, sServerPort;
+		m_ipServer.GetWindowText(sServerIP);
+		m_edPort.GetWindowText(sServerPort);
+		m_client.SetIPPort(sServerIP, _ttoi(sServerPort));
+		if (m_client.StartClient())
+		{
+			AddChat(CString(_T("클라이언트 접속 중...")));
+			SetDlgItemText(IDC_BUTTON_CONNECT, _T("접속 중....(취소)"));
+			GetDlgItem(IDC_BUTTON_SERVER)->EnableWindow(FALSE);
+		}
+	}
 }
 
 
@@ -240,4 +261,17 @@ void CChatAppDlg::OnBnClickedButtonSend()
 	m_client.AddSend(packet);
 	sSend.Format(_T("나: %s"), sSend);
 	AddChat(sSend);
+	SetDlgItemText(IDC_EDIT_INPUT, _T(""));
+}
+
+
+BOOL CChatAppDlg::PreTranslateMessage(MSG* pMsg)
+{
+	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
+	if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_RETURN)
+	{
+		OnBnClickedButtonSend();
+		return TRUE; // 여기서 TRUE를 반환하면 기본 처리를 막음
+	}
+	return CDialogEx::PreTranslateMessage(pMsg);
 }
