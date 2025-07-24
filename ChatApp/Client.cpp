@@ -217,7 +217,9 @@ void Client::SendProc(SOCKET sock)
 
         timeval timeout;
         timeout.tv_sec = 0;
-        timeout.tv_usec = 1000 * 1000; // 1초 대기
+        timeout.tv_usec = 1000 * 1000; // 100mm 대기
+
+        if (m_aSend.GetCount() <= 0) continue;
 
         int iSelectResult = select(0, nullptr, &writeSet, nullptr, &timeout);
         if (iSelectResult == SOCKET_ERROR)
@@ -257,16 +259,21 @@ int Client::Send()
         {
             iSend = send(targetSock, packet.pszData, packet.uiSize, 0);
             if (iSend > 0)
+            {
                 sValue.Format(_T("[Client][SEND] %d 소켓 %d 바이트\n"), targetSock, iSend);
+                OutputDebugString(sValue);
+            }
             else if (iSend == 0)
+            {
                 sValue.Format(_T("[Client][SEND] %d 소켓 정상 종료 (상대방이 연결 끊음)\n"), targetSock);
+                UseCallback(NETWORK_EVENT::SEND, packet, targetSock, sValue);
+            }
             else
             {
                 sValue.Format(_T("[Client][SEND] %d 소켓 실패코드 %d\n"), targetSock, WSAGetLastError());
+                UseCallback(NETWORK_EVENT::SEND, packet, targetSock, sValue);
                 return false;
             }
-
-            UseCallback(NETWORK_EVENT::SEND, packet, targetSock, sValue);
         }
         RemoveSend(0);
     }

@@ -330,7 +330,7 @@ void Server::RecvProc(SOCKET sock)
 int Server::Read(SOCKET sock)
 {
     CString sValue;
-    char buf[MAX_BUF];
+    char buf[MAX_BUF] = {};
     int iRecv = recv(sock, buf, MAX_BUF, 0);
 
     if (iRecv > 0)

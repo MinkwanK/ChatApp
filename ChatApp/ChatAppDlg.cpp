@@ -195,6 +195,20 @@ void CChatAppDlg::CallBackHandler(NETWORK_EVENT eEvent, PACKET packet, int iSock
 {
 	if (m_pInstance)
 	{
+		switch (eEvent)
+		{
+		case NETWORK_EVENT::SEND:
+		{
+
+		}break;
+		case NETWORK_EVENT::RECV:
+		{
+			if (packet.pszData && packet.uiSize > 0)
+			{
+				sValue.Format(_T("%s"), packet.pszData);
+			}
+		}break;
+		}
 		m_pInstance->AddChat(sValue);
 	}
 }
@@ -255,11 +269,12 @@ void CChatAppDlg::OnBnClickedButtonSend()
 	PACKET packet;
 	packet.uiSize = sSend.GetLength() + 1;
 	packet.pszData = new char[sSend.GetLength() + 1];
+	packet.sock = m_client.GetSocket();
 	ZeroMemory(packet.pszData, packet.uiSize);
 	memcpy_s(packet.pszData, packet.uiSize, sSend, sSend.GetLength());
 
 	m_client.AddSend(packet);
-	sSend.Format(_T("나: %s"), sSend);
+	sSend.Format(_T("나: %s"), packet.pszData);
 	AddChat(sSend);
 	SetDlgItemText(IDC_EDIT_INPUT, _T(""));
 }
