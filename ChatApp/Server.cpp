@@ -30,7 +30,7 @@ bool Server::MakeNonBlockingSocket()
     m_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_sock == INVALID_SOCKET) {
         sValue = _T("[Server] Socket creation failed.\n");
-        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, -1, sValue);
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, -1, sValue);  
         return false;
     }
 
@@ -38,7 +38,7 @@ bool Server::MakeNonBlockingSocket()
     u_long mode = 1;  // 1이면 non-blocking
     if (ioctlsocket(m_sock, FIONBIO, &mode) != 0) {
         sValue = _T("[Server] ioctlsocket failed.\n");
-        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);  
         Clear();
         return false;
     }
@@ -52,7 +52,7 @@ bool Server::MakeNonBlockingSocket()
     // 5. 바인딩
     if (bind(m_sock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
         sValue = _T("[Server] Bind failed.\n");
-        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
+        UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);  
         Clear();
         return false;
     }
@@ -74,7 +74,7 @@ bool Server::StartServer()
     {
         return false;
     }
-
+        
     if (!Listen())    //리스닝
     {
         return false;
@@ -87,18 +87,18 @@ bool Server::StartServer()
 
 bool Server::Listen()
 {
-    CString sValue;
+	CString sValue;
 
-    if (listen(GetSocket(), SOMAXCONN) == SOCKET_ERROR)
+	if (listen(GetSocket(), SOMAXCONN) == SOCKET_ERROR) 
     {
         sValue.Format(_T("[Server] Listen Failed\n"));
         UseCallback(NETWORK_EVENT::NE_ERROR, PACKET{}, m_sock, sValue);
-        Clear();
-        return false;
-    }
-    sValue.Format(_T("[Server] Port: %d Listen\n"), m_uiPort);
-    UseCallback(NETWORK_EVENT::LISTEN, PACKET{}, m_sock, sValue);
-    return true;
+		Clear();
+		return false;
+	}
+    sValue.Format(_T("[Server] Port: %d Listen\n"),m_uiPort);
+	UseCallback(NETWORK_EVENT::LISTEN, PACKET{}, m_sock, sValue);
+	return true;
 }
 
 bool Server::Accept(Server* pServer)
@@ -113,16 +113,10 @@ bool Server::Accept(Server* pServer)
 bool Server::Acceptproc()
 {
     m_accepting = true;
-    SetRunning(true);
-    // 논블로킹 방식으로 클라이언트 수신 대기 (select 사용)
-    while (!m_bExitProccess)    //클라이언트 연결을 기다림 
-    {
-        //종료 이벤트 체크
-        if (WaitForSingleObject(m_hExit, 0) == WAIT_OBJECT_0)
-        {
-            break;
-        }
 
+    // 논블로킹 방식으로 클라이언트 수신 대기 (select 사용)
+    while (!m_bStop)    //클라이언트 연결을 기다림 
+    {
         fd_set readfds;                  // 감시할 소켓 목록 선언
         FD_ZERO(&readfds);              // 목록 초기화
         FD_SET(m_sock, &readfds);       // 감시할 소켓 등록
@@ -163,10 +157,9 @@ bool Server::Acceptproc()
         }
         else
         {
-            //timeout   
+	        //timeout   
         }
     }
-    SetRunning(false);
     m_accepting = false;
     return FALSE;
 }
@@ -183,9 +176,9 @@ void Server::SendProc(SOCKET sock)
 {
     OutputDebugString(_T("[Server] Send Thread Start\n"));
     CString sValue;
-    while (!m_bExitProccess)
+    while (!m_bStop)
     {
-        DWORD dwResult = WaitForSingleObject(m_hExit, 100);
+        DWORD dwResult = WaitForSingleObject(m_hStop, 100);
         if (dwResult == WAIT_OBJECT_0)
         {
             break;
@@ -222,13 +215,12 @@ void Server::SendProc(SOCKET sock)
             if (iResult == 0)
             {
                 OutputDebugString(_T("[Server] Send 가 0이므로 Exit 이벤트 발동\n"));
-                SetEvent(m_hExit);
+                SetEvent(m_hStop);
                 RemoveAllSend();
                 break;
             }
         }
     }
-    SetRunning(false);
     OutputDebugString(_T("[Server] Send Thread End\n"));
 }
 
@@ -279,9 +271,9 @@ void Server::RecvProc(SOCKET sock)
 {
     OutputDebugString(_T("[Server] Recv Thread Start\n"));
     CString sValue;
-    while (!m_bExitProccess)
+    while (!m_bStop)
     {
-        DWORD dwResult = WaitForSingleObject(m_hExit, 100);
+        DWORD dwResult = WaitForSingleObject(m_hStop, 100);
         if (dwResult == WAIT_OBJECT_0)
         {
             break;
@@ -317,20 +309,19 @@ void Server::RecvProc(SOCKET sock)
             const int iResult = Read(sock);
             if (iResult == 0)
             {
-                SetEvent(m_hExit);
+                SetEvent(m_hStop);
                 RemoveAllSend();
                 break;
             }
         }
     }
-    SetRunning(false);
     OutputDebugString(_T("[Server] Recv Thread End\n"));
 }
 
 int Server::Read(SOCKET sock)
 {
     CString sValue;
-    char buf[MAX_BUF] = {};
+    char buf[MAX_BUF];
     int iRecv = recv(sock, buf, MAX_BUF, 0);
 
     if (iRecv > 0)
@@ -343,7 +334,7 @@ int Server::Read(SOCKET sock)
     }
     else
     {
-        sValue.Format(_T("[Server][RECV] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
+	    sValue.Format(_T("[Server][RECV] %d 소켓 실패코드 %d\n"), sock, WSAGetLastError());
         return false;
     }
 

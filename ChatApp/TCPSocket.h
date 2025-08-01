@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 
 /*
  *
@@ -14,6 +15,7 @@ enum class NETWORK_EVENT
 {
 	CONNECT = 0,
 	DISCONNECT,
+	CONNECT_FAILED,
 	LISTEN,
 	ACCEPT,
 	SEND,
@@ -26,10 +28,10 @@ typedef struct PACKET
 	SOCKET sock;
 	char* pszData;
 	int iOPCode;
-	UINT uiSize;
+	UINT uiSize;	
 
 	PACKET() : sock(INVALID_SOCKET), pszData(nullptr), iOPCode(0), uiSize(0) {}
-}PACKET, * PACKET_PTR;
+}PACKET, *PACKET_PTR;
 
 constexpr int MAX_BUF = 1024;
 using CommonCallback = void(*)(NETWORK_EVENT, PACKET, int, CString);
@@ -50,10 +52,7 @@ public:
 	void SetKey(const int iKey) { m_iKey = iKey; }
 	int GetKey() const { return m_iKey; }
 	void AddSend(PACKET packet);
-	bool GetRunning() { return m_bIsRunning; }
-	void SetRunning(bool bRun) { m_bIsRunning = bRun; }
-	void SetExit();
-
+	void Close();
 protected:
 	bool InitWinSocket();
 	void CloseWinSocket();
@@ -71,25 +70,32 @@ protected:
 	void UseCallback(NETWORK_EVENT eEvent, PACKET packet, int iSocket, const CString& sValue) const;
 
 protected:
-	CString m_sIP;
+	//Resource
+	int m_iKey;
+	bool m_bInit = false;
+	
+	//Network Resource
+	SOCKET m_sock;
+	CString m_sIP;	
 	UINT m_uiPort = -1;
 	CArray<PACKET> m_aSend;
+
+	//Thread
+	HANDLE m_hRecvThread = nullptr;
+	HANDLE m_hSendThread = nullptr;
+	
+	//Callback
 	CommonCallback m_fcbCommon;
 	SendCallback m_fcbSend;
 
 	//Exit
-	bool m_bExitProccess = false;
-	bool GetExit() const { return m_bExitProccess; }
-	void SetExit(const bool bExit) { m_bExitProccess = bExit; }
-	HANDLE m_hExit = nullptr;
+	void StopThread();
+	std::atomic<bool> m_bStop = false;
+	bool GetStop() const { return m_bStop; }
+	void SetStop(const bool bStop) { m_bStop = bStop; }
+	HANDLE m_hStop = nullptr;
 
-protected:
-	SOCKET m_sock;
-	int m_iKey;
-	bool m_bInit = false;
+	//Lock
 	CRITICAL_SECTION m_cs;
-	bool m_bIsRunning = false;
-
-
 };
 

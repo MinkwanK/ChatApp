@@ -9,6 +9,7 @@ public:
 public:
 	bool StartClient();
 	void RestartClient();
+	void Disconnect();
 
 protected:
 	//Socket
@@ -28,7 +29,6 @@ protected:
 	static void RecvThread(Client* pClient, SOCKET sock);
 	void RecvProc(SOCKET sock) override;
 	int Read(SOCKET sock) override;
-
 
 
 private:
